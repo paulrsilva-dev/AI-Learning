@@ -1,0 +1,300 @@
+<div class="app-layout">
+  <!-- Left Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h3>Settings</h3>
+    </div>
+
+    <div class="sidebar-content">
+      <!-- Model Selection -->
+      <div class="sidebar-section">
+        <h4 class="section-title">Model</h4>
+        <select [(ngModel)]="selectedModel" class="model-select">
+          @for (model of availableModels; track model.value) {
+            <option [value]="model.value">{{ model.label }}</option>
+          }
+        </select>
+      </div>
+
+      <!-- Feature Toggles -->
+      <div class="sidebar-section">
+        <h4 class="section-title">Features</h4>
+        <div class="feature-toggles">
+          <label class="toggle-label">
+            <input type="checkbox" [checked]="useRag()" (change)="toggleRag()">
+            <span>RAG (Retrieval-Augmented Generation)</span>
+          </label>
+          <label class="toggle-label">
+            <input type="checkbox" [checked]="useFunctions()" (change)="toggleFunctions()">
+            <span>Function Calling</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Filename Filter -->
+      @if (useRag()) {
+        <div class="sidebar-section">
+          <h4 class="section-title">Document Filter</h4>
+
+          <!-- PDF Selector -->
+          <div class="pdf-selector">
+            <label for="pdf-select">Select PDF:</label>
+            @if (isLoadingPdfs) {
+              <div class="loading-pdfs">Loading PDFs...</div>
+            } @else {
+              <select
+                id="pdf-select"
+                [(ngModel)]="selectedPdf"
+                (ngModelChange)="onPdfSelected($event)"
+                class="pdf-select"
+              >
+                <option value="">All PDFs</option>
+                @for (pdf of availablePdfs; track pdf) {
+                  <option [value]="pdf">{{ pdf }}</option>
+                }
+              </select>
+              @if (availablePdfs.length === 0) {
+                <div class="no-pdfs-hint">No PDFs available. Upload one to get started.</div>
+              }
+            }
+          </div>
+
+          <!-- Manual Filename Input -->
+          <div class="filename-filter">
+            <label for="filename-input">Or enter filename manually:</label>
+            <input
+              id="filename-input"
+              type="text"
+              [(ngModel)]="filenameFilter"
+              (ngModelChange)="onFilenameChange($event)"
+              placeholder="e.g., example_ai_learning.pdf"
+              class="filename-input"
+            />
+            @if (filenameFilter) {
+              <button (click)="clearFilenameFilter()" class="clear-btn" title="Clear filter">×</button>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Advanced Options -->
+      <div class="sidebar-section">
+        <h4 class="section-title">
+          <button (click)="toggleAdvancedOptions()" class="section-toggle">
+            {{ showAdvancedOptions() ? '▼' : '▶' }} Advanced Options
+          </button>
+        </h4>
+
+        @if (showAdvancedOptions()) {
+          <div class="advanced-options">
+            @if (useRag()) {
+              <div class="option-group">
+                <label class="option-label">
+                  <input type="checkbox" [(ngModel)]="useReranking">
+                  <span>Use Reranking</span>
+                </label>
+                @if (useReranking) {
+                  <select [(ngModel)]="rerankStrategy" class="option-select">
+                    @for (strategy of rerankStrategies; track strategy) {
+                      <option [value]="strategy">{{ strategy }}</option>
+                    }
+                  </select>
+                }
+              </div>
+
+              <div class="option-group">
+                <label class="option-label">
+                  <input type="checkbox" [(ngModel)]="useHybridSearch">
+                  <span>Use Hybrid Search</span>
+                </label>
+                @if (useHybridSearch) {
+                  <div class="weight-controls">
+                    <label>Vector Weight: {{ vectorWeight | number:'1.1-1' }}</label>
+                    <input type="range" min="0" max="1" step="0.1" [(ngModel)]="vectorWeight" (ngModelChange)="updateVectorWeight($event)" class="weight-slider">
+                    <label>Keyword Weight: {{ keywordWeight | number:'1.1-1' }}</label>
+                    <input type="range" min="0" max="1" step="0.1" [(ngModel)]="keywordWeight" (ngModelChange)="updateKeywordWeight($event)" class="weight-slider">
+                  </div>
+                }
+              </div>
+
+              <div class="option-group">
+                <label class="option-label">
+                  <input type="checkbox" [(ngModel)]="useQueryExpansion">
+                  <span>Use Query Expansion</span>
+                </label>
+              </div>
+
+              <div class="option-group">
+                <label class="option-label">
+                  <input type="checkbox" [(ngModel)]="detectHallucinations">
+                  <span>Detect Hallucinations</span>
+                </label>
+                @if (detectHallucinations) {
+                  <label class="option-label sub-option">
+                    <input type="checkbox" [(ngModel)]="useLlmVerification">
+                    <span>Use LLM Verification (more accurate)</span>
+                  </label>
+                }
+              </div>
+            }
+
+            <div class="option-group">
+              <label class="option-label">
+                <span>Prompt Strategy:</span>
+                <select [(ngModel)]="promptStrategy" class="option-select">
+                  @for (strategy of promptStrategies; track strategy.value) {
+                    <option [value]="strategy.value">{{ strategy.label }}</option>
+                  }
+                </select>
+              </label>
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- Upload Link -->
+      <div class="sidebar-section upload-link-section">
+        <a routerLink="/upload" class="upload-link">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+          Upload PDF Document
+        </a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Right Side - Chat Interface -->
+  <div class="chat-container">
+    <div class="chat-header">
+      <div class="header-content">
+        <div>
+          <h2>AI Chat Assistant</h2>
+          <p class="subtitle">Powered by OpenAI with RAG & Function Calling</p>
+        </div>
+        <button (click)="clearChat()" class="clear-chat-btn" title="Clear chat history">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+          Clear Chat
+        </button>
+      </div>
+    </div>
+
+    <div class="messages-container">
+    @for (message of messages(); track $index) {
+      <div class="message" [class.user-message]="message.isUser" [class.ai-message]="!message.isUser">
+        <div class="message-content">
+          <div class="message-header">
+            <div class="message-text">{{ message.text }}</div>
+            <button 
+              (click)="copyMessage(message.text, $index)" 
+              class="copy-btn"
+              [class.copied]="isMessageCopied($index)"
+              [title]="isMessageCopied($index) ? 'Copied!' : 'Copy message'"
+            >
+              @if (isMessageCopied($index)) {
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>Copied!</span>
+              } @else {
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <span>Copy</span>
+              }
+            </button>
+          </div>
+
+          <!-- RAG Sources -->
+          @if (message.sources && message.sources.length > 0) {
+            <div class="sources-section">
+              <div class="sources-header">📚 Sources ({{ message.sources.length }}):</div>
+              @for (source of message.sources; track source.chunk_index) {
+                <div class="source-item">
+                  <div class="source-header" (click)="toggleSourcePreview(source.chunk_index)">
+                    <span class="source-index">[{{ source.chunk_index }}]</span>
+                    <span class="source-filename">{{ source.filename }}</span>
+                    <span class="source-page">Page {{ source.page_number }}</span>
+                    <span class="source-similarity">Similarity: {{ source.similarity | number:'1.2-2' }}</span>
+                    <span class="toggle-icon">{{ isSourceExpanded(source.chunk_index) ? '▼' : '▶' }}</span>
+                  </div>
+                  @if (isSourceExpanded(source.chunk_index)) {
+                    <div class="source-preview">
+                      <div class="source-preview-text">{{ source.text_preview || 'No preview available' }}</div>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
+
+          <!-- Function Calls -->
+          @if (message.functionCalls && message.functionCalls.length > 0) {
+            <div class="functions-section">
+              <div class="functions-header">🔧 Functions Used:</div>
+              @for (funcCall of message.functionCalls; track $index) {
+                <div class="function-item">
+                  <span class="function-name">{{ funcCall.function }}()</span>
+                  <div class="function-details">
+                    <div class="function-args">Args: {{ funcCall.arguments | json }}</div>
+                    <div class="function-result">Result: {{ funcCall.result }}</div>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+
+          <div class="message-time">{{ message.timestamp | date:'short' }}</div>
+        </div>
+      </div>
+    }
+
+    @if (isLoading()) {
+      <div class="message ai-message">
+        <div class="message-content">
+          <div class="typing-indicator">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+
+  @if (error()) {
+    <div class="error-message">
+      {{ error() }}
+    </div>
+  }
+
+  <div class="input-container">
+    <textarea
+      [(ngModel)]="userMessage"
+      (keydown)="onKeyPress($event)"
+      placeholder="Type your message here... (Press Enter to send)"
+      rows="3"
+      [disabled]="isLoading()"
+      class="message-input"
+    ></textarea>
+    <button
+      (click)="sendMessage()"
+      [disabled]="isLoading() || !userMessage.trim()"
+      class="send-button"
+    >
+      <span>Send</span>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="22" y1="2" x2="11" y2="13"></line>
+        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+      </svg>
+    </button>
+  </div>
+  </div>
+</div>
+
